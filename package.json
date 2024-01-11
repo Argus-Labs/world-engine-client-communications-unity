@@ -1,0 +1,52 @@
+{
+  "name": "com.argus.world-engine-client",
+  "version": "0.1.0",
+  "displayName": "World Engine Client",
+  "description": "Use this package to communicate with an Argus Labs World Engine based backend.",
+  "unity": "2022.3",
+  "author": {
+    "name": "Argus Labs",
+    "url": "https://argus.gg"
+  },
+  "documentationUrl": "https://world.dev/client/introduction",
+  "license": "Apache-2.0",
+  "licensesUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+  "dependencies": {
+    "com.heroiclabs.nakama-unity": "https://github.com/heroiclabs/nakama-unity.git?path=/Packages/Nakama#v3.6.0"
+  },
+  "keywords": [
+    "argus",
+    "argus labs",
+    "world",
+    "engine",
+    "world engine",
+    "cardinal",
+    "nakama",
+    "cloud",
+    "prover",
+    "cloud prover",
+    "web3",
+    "blockchain",
+    "crypto",
+    "zk",
+    "zero",
+    "knowledge",
+    "proof",
+    "zero knowledge",
+    "zero knowledge proof",
+    "client",
+    "communication",
+    "communications",
+    "network",
+    "networking",
+    "c#",
+    "unity",
+    "unity3d",
+    "game",
+    "dev",
+    "game dev",
+    "game development",
+    "game developer",
+    "gaming"
+  ]
+}

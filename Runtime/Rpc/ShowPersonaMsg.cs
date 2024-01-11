@@ -1,0 +1,48 @@
+// Copyright 2024 Argus Labs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System;
+using System.Diagnostics.CodeAnalysis;
+using UnityEngine;
+
+namespace ArgusLabs.WorldEngineClient.Communications.Rpc
+{
+    [Serializable]
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    // Note: Please keep this public and camelCased for use with the simpler .ToJson() converter.
+    public struct ShowPersonaMsg
+    {
+        [SerializeField] private string personaTag;
+        [SerializeField] private string status;
+        [SerializeField] private ulong tick;
+        [SerializeField] private string txHash;
+
+        public string PersonaTag => personaTag;
+        
+        // Note: Please handle this properly with a helper if/when duplicating this code.
+        public ResponseStatus Status
+        {
+            get
+            {
+                if (status is null || status.Length < 2)
+                    return ResponseStatus.Unknown;
+                
+                return Enum.Parse<ResponseStatus>(char.ToUpper(status[0]) + status[1..]);
+            }
+        }
+
+        public ulong Tick => tick;
+        public string TxHash => txHash;
+    }
+}
