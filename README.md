@@ -1,5 +1,7 @@
-# World Engine Client
-World Engine Client provides a C# client library for interacting with Argus Labs' World Engine
+# World Engine Client Communications for Unity
+gg.argus.world-engine-client-communications-unity
+#
+World Engine Client Communications for Unity provides a C# client library for interacting with Argus Labs' World Engine
 via the Unity game engine.
 
 ## Getting Started

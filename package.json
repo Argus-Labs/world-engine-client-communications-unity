@@ -1,7 +1,7 @@
 {
-  "name": "com.argus.world-engine-client",
+  "name": "gg.argus.world-engine-client-communications-unity",
   "version": "0.1.0",
-  "displayName": "World Engine Client",
+  "displayName": "World Engine Client Communications for Unity",
   "description": "Use this package to communicate with an Argus Labs World Engine based backend.",
   "unity": "2022.3",
   "author": {
