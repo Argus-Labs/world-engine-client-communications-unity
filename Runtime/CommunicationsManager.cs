@@ -30,8 +30,9 @@ namespace ArgusLabs.WorldEngineClient.Communications
 
         private readonly Client _client;
         private ISession _session;
-        private ISocket _socket;
         private string _deviceId;
+        
+        public ISocket Socket { get; private set; }
 
         /// <summary>
         /// CommunicationsManager will fall back to this when no CancellationToken is provided in the various methods where it could be required.
@@ -72,12 +73,12 @@ namespace ArgusLabs.WorldEngineClient.Communications
                 Debug.Log("Authenticated.");
 
                 // No cleanup. No worries. Lets see.
-                _socket = _client.NewSocket(useMainThread: true);
-                await _socket.ConnectAsync(_session, appearOnline: true, connectTimeout: TimeoutDuration);
+                Socket = _client.NewSocket(useMainThread: true);
+                await Socket.ConnectAsync(_session, appearOnline: true, connectTimeout: TimeoutDuration);
 
-                if (_socket.IsConnected)
+                if (Socket.IsConnected)
                 {
-                    Debug.Log($"Socket.IsConnected? {_socket.IsConnected}");
+                    Debug.Log($"Socket.IsConnected? {Socket.IsConnected}");
                 }
                 else
                 {
@@ -98,7 +99,7 @@ namespace ArgusLabs.WorldEngineClient.Communications
 
                 Debug.Log($"Found: MatchId: {matchInfo.MatchId} Label: {matchInfo.Label} Size: {matchInfo.Size} HandlerName: {matchInfo.HandlerName} TickRate: {matchInfo.TickRate}");
 
-                var match = await _socket.JoinMatchAsync(matchInfo.MatchId);
+                var match = await Socket.JoinMatchAsync(matchInfo.MatchId);
 
                 Debug.Log($"Self: {match.Self}");
                 Debug.Log($"{string.Join('\n', match.Presences)}");
@@ -273,7 +274,7 @@ namespace ArgusLabs.WorldEngineClient.Communications
                 response.IsComplete = true; // <-- only set when tx_hashes match!
             }
 
-            _socket.ReceivedMatchState += OnReceived;
+            Socket.ReceivedMatchState += OnReceived;
 
             var result = await RpcAsync(rpcId, payload, cancellation);
             response.Result = result;
@@ -285,14 +286,14 @@ namespace ArgusLabs.WorldEngineClient.Communications
             else
             {
                 Debug.Log($"SocketRequestAsync was NOT successful for: {rpcId}");
-                _socket.ReceivedMatchState -= OnReceived;
+                Socket.ReceivedMatchState -= OnReceived;
                 return response;
             }
 
             for (float t = 0f; (t < timeout) && !response.IsComplete; t += Time.deltaTime)
                 await Task.Yield();
 
-            _socket.ReceivedMatchState -= OnReceived;
+            Socket.ReceivedMatchState -= OnReceived;
 
             if (response.IsComplete)
             {
