@@ -231,10 +231,7 @@ namespace ArgusLabs.WorldEngineClient.Communications
             async void OnReceivedNotification(IApiNotification notification)
             {
                 if (notification.Subject != "receipt") // <-- magic!
-                {
-                    Debug.Log("Received notification, but it's not a receipt.");
                     return;
-                }
                 
                 wasReceived = true;
 
@@ -282,7 +279,9 @@ namespace ArgusLabs.WorldEngineClient.Communications
             // Wait for the event to be processed.
             await Awaitable.NextFrameAsync(cancellation);
             await Awaitable.NextFrameAsync(cancellation);
-
+            
+            Socket.ReceivedNotification -= OnReceivedNotification;
+            
             if (!wasReceived)
             {
                 response.IsComplete = false;
@@ -313,13 +312,8 @@ namespace ArgusLabs.WorldEngineClient.Communications
             else
             {
                 Debug.Log($"SocketRequestAsync was NOT successful for: {rpcId}");
-                Socket.ReceivedNotification -= OnReceivedNotification;
                 return response;
             }
-            
-            await Awaitable.WaitForSecondsAsync(timeout, cancellation);
-
-            Socket.ReceivedNotification -= OnReceivedNotification;
 
             if (response.IsComplete)
             {
