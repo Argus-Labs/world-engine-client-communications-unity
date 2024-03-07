@@ -19,7 +19,7 @@ namespace ArgusLabs.WorldEngineClient.Communications.Rpc
 {
     [Serializable]
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    public struct ClaimPersonaReceipt
+    public struct TransactionReceipt
     {
         //{"tx_hash":"0xf0ed48ab25d26ea0d1d389740415b5ff9bda3c3c86adc0235fe4a6f1193c15c5","result":{"Success":true},"errors":[]}
         public ClaimPersonaReceiptResult result;

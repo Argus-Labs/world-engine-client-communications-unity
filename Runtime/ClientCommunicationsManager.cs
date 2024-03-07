@@ -85,24 +85,6 @@ namespace ArgusLabs.WorldEngineClient.Communications
                     Debug.LogError("Could not open socket.");
                     return false;
                 }
-
-                var matchesResult = await _client.ListMatchesAsync(_session, min: 0, max: 100, limit: 100,
-                    authoritative: true, label: string.Empty, query: string.Empty, canceller: cancellation);
-                var matches = matchesResult.Matches;
-                var matchInfo = matches.FirstOrDefault();
-
-                if (matchInfo is null)
-                {
-                    Debug.LogError("Could not find a match.");
-                    return false;
-                }
-
-                Debug.Log($"Found: MatchId: {matchInfo.MatchId} Label: {matchInfo.Label} Size: {matchInfo.Size} HandlerName: {matchInfo.HandlerName} TickRate: {matchInfo.TickRate}");
-
-                var match = await Socket.JoinMatchAsync(matchInfo.MatchId);
-
-                Debug.Log($"Self: {match.Self}");
-                Debug.Log($"{string.Join('\n', match.Presences)}");
             }
             catch (Exception ex)
             {
@@ -114,12 +96,12 @@ namespace ArgusLabs.WorldEngineClient.Communications
         }
 
         // The only real value this method provides is verbose debug logging.
-        public async ValueTask<SocketResponse<ClaimPersonaReceipt>> TryClaimPersonaAsync(string personaTag, CancellationToken cancellation = default)
+        public async ValueTask<SocketResponse<TransactionReceipt>> TryClaimPersonaAsync(string personaTag, CancellationToken cancellation = default)
         {
             if (cancellation == default)
                 cancellation = DefaultCancellationToken;
 
-            SocketResponse<ClaimPersonaReceipt> response = await ClaimPersonaAsync(new PersonaMsg { personaTag = personaTag }, cancellation);
+            SocketResponse<TransactionReceipt> response = await ClaimPersonaAsync(new PersonaMsg { personaTag = personaTag }, cancellation);
 
             if (!response.Result.WasSuccessful)
             {
@@ -242,58 +224,96 @@ namespace ArgusLabs.WorldEngineClient.Communications
                 cancellation = DefaultCancellationToken;
 
             var response = new SocketResponse<T>();
+            bool wasReceived = false;
+            
+            Socket.ReceivedNotification += OnReceivedNotification;
 
-            void OnReceived(IMatchState matchState)
+            async void OnReceivedNotification(IApiNotification notification)
             {
-                Debug.Log($"OnReceived(matchState): We received matchState for: {rpcId}");
-                string json = Encoding.UTF8.GetString(matchState.State);
-                Debug.Log($"OnReceived(matchState): {rpcId} json:\n{json}");
+                if (notification.Subject != "receipt") // <-- magic!
+                    return;
+                
+                wasReceived = true;
 
-                // Even though the actual json contains much more than txHash, we'll ignore all that
-                // and just pretend that txHash is all there is. Then later we'll convert the same json to typeof(T).
+                await Awaitable.NextFrameAsync(cancellation);
+                await Awaitable.NextFrameAsync(cancellation);
+                
+                Debug.Log($"OnReceivedNotification: Subject: {notification.Subject} Content: {notification.Content} Id: {notification.Id} SenderId: {notification.SenderId} Code: {notification.Code}");
+                
+                if (notification.Persistent)
+                    Debug.LogWarning($"Received persistent notification! This is unexpected and may cause memory leaks in the backend.\nPayload: {notification.Content}");
+                
+                if (string.IsNullOrWhiteSpace(notification.Content))
+                {
+                    Debug.LogError($"Notification content is empty: '{notification.Content}'");
+                    response.IsComplete = true;
+                    return;
+                }
+                
+                Debug.Log($"response.Result.Payload: {response.Result.Payload}");
+                
+                var receipt = JsonUtility.FromJson<TransactionReceipt>(notification.Content);
 
                 if (string.IsNullOrWhiteSpace(response.Result.Payload))
                 {
-                    Debug.LogError($"OnReceived(matchState): Backend response payload is empty: '{response.Result.Payload}'");
-                    return;
+                    var responseTxHash = JsonUtility.FromJson<TxHash>(response.Result.Payload);
+
+                    if (receipt.txHash != responseTxHash.txHash)
+                    {
+                        Debug.Log("txHashes DO NOT MATCH. That's fine.");
+                        return;
+                    }
                 }
 
-                var responseTxHash = JsonUtility.FromJson<TxHash>(response.Result.Payload);
-                var matchStateTxHash = JsonUtility.FromJson<TxHash>(json);
-
-                Debug.Log($"OnReceived(matchState): responseTxHash:{responseTxHash.txHash} <- same? -> matchStateTxHash:{matchStateTxHash.txHash}");
-
-                if (responseTxHash.txHash != matchStateTxHash.txHash)
-                {
-                    Debug.Log("OnReceived(matchState): txHashes DO NOT MATCH. That's fine.");
-                    return;
-                }
-
-                Debug.Log("OnReceived(matchState): txHashes match.");
-                response.Content = JsonUtility.FromJson<T>(json);
-                response.IsComplete = true; // <-- only set when tx_hashes match!
+                response.Content = notification.Content.FromJson<T>();
+                response.IsComplete = true; // <-- only set when tx_hashes match or certain other conditions. See above.
             }
-
-            Socket.ReceivedMatchState += OnReceived;
-
-            var result = await RpcAsync(rpcId, payload, cancellation);
+            
+            RpcResult result = await RpcAsync(rpcId, payload, cancellation);
             response.Result = result;
-
+            
+            // Allow event to wait for processing.
+            await Awaitable.NextFrameAsync(cancellation);
+            await Awaitable.NextFrameAsync(cancellation);
+            
+            // Wait for the event to be processed.
+            await Awaitable.NextFrameAsync(cancellation);
+            await Awaitable.NextFrameAsync(cancellation);
+            
+            Socket.ReceivedNotification -= OnReceivedNotification;
+            
+            if (!wasReceived)
+            {
+                response.IsComplete = false;
+                return response;
+            }
+            
             if (result.WasSuccessful)
             {
                 Debug.Log($"SocketRequestAsync was successful for: {rpcId}");
+                Debug.Log($"response.Payload: {result.Payload}");
+
+                if (string.IsNullOrWhiteSpace(result.Payload))
+                {
+                    Debug.Log($"result.Payload is null for: {rpcId} - This may be fine.");
+                    return response;
+                }
+
+                try
+                {
+                    response.Content = result.Payload.FromJson<T>();
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log($"Failed to parse payload for: {rpcId} - {ex.Message} - This may be fine.");
+                    return response;
+                }
             }
             else
             {
                 Debug.Log($"SocketRequestAsync was NOT successful for: {rpcId}");
-                Socket.ReceivedMatchState -= OnReceived;
                 return response;
             }
-
-            for (float t = 0f; (t < timeout) && !response.IsComplete; t += Time.deltaTime)
-                await Task.Yield();
-
-            Socket.ReceivedMatchState -= OnReceived;
 
             if (response.IsComplete)
             {
@@ -310,8 +330,8 @@ namespace ArgusLabs.WorldEngineClient.Communications
         // Note: The constant RPC IDs are inlined here to avoid code duplication for no reason.
         // As soon as there's a decent reason, then we should immediately switch and provide a separate list of constants.
 
-        private async ValueTask<SocketResponse<ClaimPersonaReceipt>> ClaimPersonaAsync(PersonaMsg msg, CancellationToken cancellation = default, float timeout = TimeoutDuration)
-            => await SocketRequestAsync<ClaimPersonaReceipt>("nakama/claim-persona", msg.ToJson(), cancellation, timeout);
+        private async ValueTask<SocketResponse<TransactionReceipt>> ClaimPersonaAsync(PersonaMsg msg, CancellationToken cancellation = default, float timeout = TimeoutDuration)
+            => await SocketRequestAsync<TransactionReceipt>("nakama/claim-persona", msg.ToJson(), cancellation, timeout);
         
         private async ValueTask<RpcResult> ShowPersonaAsync(PersonaMsg msg, CancellationToken cancellation = default)
             => await RpcAsync("nakama/show-persona", msg.ToJson(), cancellation);
