@@ -1,6 +1,6 @@
 {
   "name": "gg.argus.world-engine-client-communications-unity",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "World Engine Client Communications for Unity",
   "description": "Use this package to communicate with an Argus Labs World Engine based backend.",
   "unity": "2022.3",
@@ -12,7 +12,7 @@
   "license": "Apache-2.0",
   "licensesUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt",
   "dependencies": {
-    "com.heroiclabs.nakama-unity": "https://github.com/heroiclabs/nakama-unity.git?path=/Packages/Nakama#v3.6.0"
+    "com.heroiclabs.nakama-unity": "https://github.com/heroiclabs/nakama-unity.git?path=/Packages/Nakama"
   },
   "keywords": [
     "argus",
