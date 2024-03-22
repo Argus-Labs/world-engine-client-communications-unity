@@ -1,14 +1,14 @@
 {
   "name": "gg.argus.world-engine-client-communications-unity",
-  "version": "0.2.0",
-  "displayName": "World Engine client SDK for Unity",
-  "description": "A client SDK for the World Engine",
+  "version": "0.2.1",
+  "displayName": "World Engine Client Communications for Unity",
+  "description": "Use this package to communicate with an Argus Labs World Engine based backend.",
   "unity": "2022.3",
   "author": {
-    "name": "Argus Labs.",
+    "name": "Argus Labs",
     "url": "https://argus.gg"
   },
-  "documentationUrl": "https://world.dev",
+  "documentationUrl": "https://world.dev/client/introduction",
   "license": "Apache-2.0",
   "licensesUrl": "https://www.apache.org/licenses/LICENSE-2.0.txt",
   "dependencies": {

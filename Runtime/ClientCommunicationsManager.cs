@@ -13,8 +13,6 @@
 // limitations under the License.
 
 using System;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ArgusLabs.WorldEngineClient.Communications.Rpc;
@@ -185,8 +183,7 @@ namespace ArgusLabs.WorldEngineClient.Communications
             try
             {
                 Debug.Log($"RpcAsync: RPC: '{rpcId}' Payload: '{payload}'");
-
-                var response = await _client.RpcAsync(_session, rpcId, payload, canceller: cancellation);
+                IApiRpc response = await _client.RpcAsync(_session, rpcId, payload, canceller: cancellation);
                 result.Payload = response.Payload;
                 result.WasSuccessful = true;
             }
@@ -222,31 +219,36 @@ namespace ArgusLabs.WorldEngineClient.Communications
         {
             if (cancellation == default)
                 cancellation = DefaultCancellationToken;
-
+            
+            CancellationTokenSource timeoutCts = new();
+            var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellation, timeoutCts.Token);
+            
             var response = new SocketResponse<T>();
             bool wasReceived = false;
             
             Socket.ReceivedNotification += OnReceivedNotification;
 
-            async void OnReceivedNotification(IApiNotification notification)
+            void OnReceivedNotification(IApiNotification notification)
             {
                 if (notification.Subject != "receipt") // <-- magic!
+                {
+                    if (notification.Persistent)
+                        Debug.LogWarning($"Received persistent notification! This is unexpected and may cause memory leaks in the backend.\nPayload: {notification.Content}");
                     return;
-                
+                }
+
                 wasReceived = true;
 
-                await Awaitable.NextFrameAsync(cancellation);
-                await Awaitable.NextFrameAsync(cancellation);
+                //await Awaitable.NextFrameAsync(cancellation);
+                //await Awaitable.NextFrameAsync(cancellation);
                 
                 Debug.Log($"OnReceivedNotification: Subject: {notification.Subject} Content: {notification.Content} Id: {notification.Id} SenderId: {notification.SenderId} Code: {notification.Code}");
-                
-                if (notification.Persistent)
-                    Debug.LogWarning($"Received persistent notification! This is unexpected and may cause memory leaks in the backend.\nPayload: {notification.Content}");
                 
                 if (string.IsNullOrWhiteSpace(notification.Content))
                 {
                     Debug.LogError($"Notification content is empty: '{notification.Content}'");
                     response.IsComplete = true;
+                    timeoutCts.Cancel();
                     return;
                 }
                 
@@ -267,18 +269,28 @@ namespace ArgusLabs.WorldEngineClient.Communications
 
                 response.Content = notification.Content.FromJson<T>();
                 response.IsComplete = true; // <-- only set when tx_hashes match or certain other conditions. See above.
+                timeoutCts.Cancel();
             }
             
-            RpcResult result = await RpcAsync(rpcId, payload, cancellation);
+            RpcResult result = await RpcAsync(rpcId, payload, linkedCts.Token);
             response.Result = result;
             
-            // Allow event to wait for processing.
-            await Awaitable.NextFrameAsync(cancellation);
-            await Awaitable.NextFrameAsync(cancellation);
+            // Allow event time for processing.
+            try
+            {
+                await Awaitable.WaitForSecondsAsync(timeout, linkedCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Canceling is expected behavior.
+            }
             
-            // Wait for the event to be processed.
-            await Awaitable.NextFrameAsync(cancellation);
-            await Awaitable.NextFrameAsync(cancellation);
+            // await Awaitable.NextFrameAsync(cancellation);
+            // await Awaitable.NextFrameAsync(cancellation);
+            //
+            // // Wait for the event to be processed.
+            // await Awaitable.NextFrameAsync(cancellation);
+            // await Awaitable.NextFrameAsync(cancellation);
             
             Socket.ReceivedNotification -= OnReceivedNotification;
             
@@ -303,9 +315,16 @@ namespace ArgusLabs.WorldEngineClient.Communications
                 {
                     response.Content = result.Payload.FromJson<T>();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Debug.Log($"Failed to parse payload for: {rpcId} - {ex.Message} - This may be fine.");
+                    if (result.Payload.ToLower().Trim().Equals("null", StringComparison.InvariantCulture))
+                    {
+                        Debug.Log($"result.Payload is the actual string \"null\" for: {rpcId} - Weird but maybe fine.");
+                        return response;
+                    }
+                    
+                    Debug.Log($"Failed to parse payload for: {rpcId} - This may be fine.");
+                    Debug.Log(result.Payload);
                     return response;
                 }
             }
